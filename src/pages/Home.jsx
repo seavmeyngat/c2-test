@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import products from "../assets/data/products.json";
 
@@ -7,10 +8,33 @@ export default function Home() {
   // Featured: first 4 items (simple + predictable for practice)
   const featured = items.slice(0, 4);
 
-  // Categories: unique by category.id
-  const categories = Array.from(
-    new Map(items.map((p) => [p.category.id, p.category])).values()
-  );
+  // Categories: fetch from remote API (limit=4)
+  const [categories, setCategories] = useState([]);
+  const [catLoading, setCatLoading] = useState(true);
+  const [catError, setCatError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCatLoading(true);
+    setCatError(null);
+
+    fetch("https://api.escuelajs.co/api/v1/categories?limit=4", {
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => setCategories(data))
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        console.error(err);
+        setCatError(err.message ?? "Failed to load categories");
+      })
+      .finally(() => setCatLoading(false));
+
+    return () => controller.abort();
+  }, []);
 
   // Latest: sort by creationAt desc, take 4
   const latest = [...items]
@@ -48,7 +72,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Featured Products */}
+      {/* Featured Products */}
         <section className="space-y-3">
           <div className="flex items-end justify-between">
             <h2 className="text-lg font-semibold">Featured products</h2>
@@ -57,18 +81,18 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="space-y-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             {featured.map((p) => (
               <Link
                 key={p.id}
                 to={`/products/${p.id}`}
                 className="block rounded-2xl border bg-white p-4 hover:shadow-sm transition"
               >
-                <div className="flex gap-3">
+                <div className="flex flex-col gap-3">
                   <img
                     src={p.images?.[0] ?? "https://placehold.co/600x400"}
                     alt={p.title}
-                    className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                    className="w-[100%] shrink-0 rounded-xl object-cover"
                     loading="lazy"
                   />
                   <div className="min-w-0 flex-1">
@@ -91,30 +115,37 @@ export default function Home() {
             ))}
           </div>
         </section>
-
         {/* Categories */}
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Categories</h2>
 
           <div className="space-y-3">
-            {categories.map((c) => (
-              <Link
-                key={c.id}
-                to="/products"
-                className="flex items-center gap-3 rounded-2xl border bg-white p-4 hover:bg-slate-50 transition"
-              >
-                <img
-                  src={c.image}
-                  alt={c.name}
-                  className="h-12 w-12 rounded-xl object-cover"
-                  loading="lazy"
-                />
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{c.name}</div>
-                  <div className="text-xs text-slate-600">Tap to browse</div>
-                </div>
-              </Link>
-            ))}
+            {catLoading ? (
+              <div className="text-sm text-slate-500">Loading categories…</div>
+            ) : catError ? (
+              <div className="text-sm text-red-500">Failed to load categories</div>
+            ) : (
+              <div className="space-y-3">
+                {categories.map((c) => (
+                  <Link
+                    key={c.id}
+                    to="/products"
+                    className="flex items-center gap-3 rounded-2xl border bg-white p-4 hover:bg-slate-50 transition"
+                  >
+                    <img
+                      src={c.image ?? "https://placehold.co"}
+                      alt={c.name}
+                      className="h-12 w-12 rounded-xl object-cover"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{c.name}</div>
+                      <div className="text-xs text-slate-600">Tap to browse</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
